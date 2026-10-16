@@ -1,0 +1,4 @@
+requests
+truststore
+boto3
+pytest

@@ -1,0 +1,81 @@
+name: Check PR Base Template Information
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize]
+jobs:
+  check-pr-base:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check PR Base Template Information
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const title = context.payload.pull_request.title;
+            const branch = context.payload.pull_request.head.ref;
+            const body = context.payload.pull_request.body || "";
+
+            // 允許的類型
+            const types = ['Add', 'Fix', 'Optimize', 'Remove', 'Other'];
+
+            // 解析 PR title
+            const titleMatch = title.match(/^\[([A-Za-z]+)\]\s+/);
+            // 解析 branch name
+            const branchMatch = branch.match(/^([a-z]+)\//);
+
+            let warnMsg = "";
+
+            if (!titleMatch || !types.includes(titleMatch[1])) {
+              warnMsg += `⚠️ PR title 必須以 [Add]/[Fix]/[Optimize]/[Remove]/[Other] 開頭(請注意[]後面要多留一個空格)，例如: [Add] 新增xxx功能\n`;
+            }
+            if (!branchMatch || !types.map(t => t.toLowerCase()).includes(branchMatch[1])) {
+              warnMsg += `⚠️ branch name 必須以 add/、fix/、optimize/、remove/、other/ 開頭，例如: add/feature_xxx\n`;
+            }
+            if (titleMatch && branchMatch && titleMatch[1].toLowerCase() !== branchMatch[1]) {
+              warnMsg += `⚠️ PR title 與 branch name 類型需一致，例如: [Add] ... 對應 add/xxx\n`;
+            }
+
+            // 檢查 PR body 是否包含必要的模板內容
+            if (!body.includes("### 內容")) {
+              warnMsg += `⚠️ PR 描述中缺少 "內容" 區塊，請使用 PR 模板 "### 內容"\n`;
+            }
+            
+            if (!body.includes("### Check List")) {
+              warnMsg += `⚠️ PR 描述中缺少 "Check List" 區塊，請使用 PR 模板 "### Check List"\n`;
+            }
+
+            // 檢查 Check List
+            const checkListPattern = /- \[([ x])\]\s*(.+)/g;
+            const checkListItems = [];
+            let match;
+            
+            while ((match = checkListPattern.exec(body)) !== null) {
+              const isChecked = match[1] === 'x';
+              const itemText = match[2].trim();
+              checkListItems.push({ isChecked, itemText });
+            }
+
+            if (checkListItems.length > 0) {
+              const uncheckedItems = checkListItems.filter(item => !item.isChecked);
+              
+              if (uncheckedItems.length > 0) {
+                const invalidUncheckedItems = uncheckedItems.filter(item => {
+                  // 檢查是否包含 "=>" 或 "->" 表示已評估
+                  return !item.itemText.includes('=>') && !item.itemText.includes('->');
+                });
+                
+                if (invalidUncheckedItems.length > 0) {
+                  warnMsg += `⚠️ 以下 Check List 項目未勾選且未提供說明 (請使用包含 "=>" 或 "->" 搭配說明)：\n`;
+                  invalidUncheckedItems.forEach(item => {
+                    warnMsg += `   • ${item.itemText}\n`;
+                  });
+                  warnMsg += `\n範例格式：- [ ] 檢查自動化測試步驟與 Test Rail 一致 => 已知現況沒有對應 Test Rail 可參考\n`;
+                }
+              }
+            }
+
+            if (warnMsg) {
+              core.setFailed(warnMsg);
+            } else {
+              core.info("✅ PR title、branch name 格式與 Check List 檢查通過！");
+            }

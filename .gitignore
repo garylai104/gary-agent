@@ -1,0 +1,16 @@
+.env
+.DS_Store
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+motes/
+.claude/settings.local.json
+
+# skills/ 只以加密檔 skills.tar.gz.enc 進版控（scripts/skills_crypt.py）
+/skills/
+/skills.tar.gz
+
+# 公司內部文件：內含截圖無法逐張確認是否露出帳密/token，且檔案大
+*.docx
+docs/
